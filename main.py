@@ -1,5 +1,5 @@
 import fabric # importing the base package
-from fabric import Application
+from fabric import Application , Fabricator
 from fabric.widgets.box import Box # grabs the Box class from Fabric
 from fabric.widgets.label import Label # gets the Label class
 from fabric.widgets.window import Window # grabs the Window class from Fabric
@@ -7,7 +7,8 @@ from fabric.widgets.button import Button # grabs the Button class from Fabric
 from fabric.widgets.datetime import DateTime
 from fabric.widgets.centerbox import CenterBox
 from fabric.widgets.wayland import WaylandWindow as Window
-from fabric.core.service import Service, Signal  # Replace the previous Window import with this
+from fabric.core.service import Service, Signal , Property
+import os  # Replace the previous Window import with this
 
 def create_button():
     return Button(label="Click me!", on_clicked=lambda b, *_: b.set_label("button clicked!"))
@@ -20,6 +21,13 @@ class StatusBar(Window):
             **kwargs
         )
 
+        self.battery_label = Label(label="Battery: --%")
+        self.battery_fabricator = Fabricator(
+            poll_from=lambda *_: open("/sys/class/power_supply/BAT1/capacity").read().strip() 
+            if os.path.exists("/sys/class/power_supply/BAT1/capacity") 
+            else "N/A",interval=1000  
+            ).build().connect("changed", lambda _, val: self.battery_label.set_label(f"Battery: {val}%")).unwrap()
+          
         self.date_time = DateTime()
         self.box1 = Box(
                     orientation="v",
@@ -37,17 +45,7 @@ class StatusBar(Window):
                 Label(label="This is the second box."),
                     ]
                 )
-        self.box2 = Box(
-                    spacing=20,
-                    orientation="h",
-                    children=[
-                        Label(label="this is the first element in the second box"),
-                        Label(label="this is the second element in the second box"),
-                    ]
-                )
-            
-        self.box1.add(self.box2) # add box_2 to box1
-        self.children = CenterBox(center_children=self.date_time,start_children=self.box1)
+        self.children = CenterBox(center_children=self.date_time,start_children=self.box1 , end_children=self.battery_label) # add box1 to the window
         # date_widget = DateTime()
 if __name__ == "__main__":
     bar = StatusBar()
