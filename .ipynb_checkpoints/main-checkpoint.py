@@ -11,7 +11,6 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk
 from fabric.widgets.eventbox import EventBox
-from fabric.widgets.revealer import Revealer
 
 class calendarpopup(Window):
     def __init__(self, **kwargs):
@@ -63,12 +62,6 @@ class settingspopup(Window):
         # Wi-Fi toggle
         self.wifi_label = Label(label="Wi-Fi: --")
         self.wifi_switch = Gtk.Switch()
-        self.wifi_revealer = Gtk.Revealer()
-        self.wifi_expand_button = Button(label = "⌄")
-        self.wifi_expand_button.connect("clicked", lambda *_: [self.scan_networks(), self.wifi_revealer.set_reveal_child(not self.wifi_revealer.get_reveal_child())])
-        self.wifi_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
-        self.handler_box = Box(orientation="v",  spacing=5,)
-        self.wifi_revealer.add(self.handler_box)
         self.wifi_switch.set_valign(Gtk.Align.CENTER)
         self.wifi_handler = self.wifi_switch.connect(
             "state-set",
@@ -76,24 +69,13 @@ class settingspopup(Window):
         )
         
         wifi_box = Box(orientation="h",
-         spacing=10, children=[self.wifi_label,self.wifi_switch,self.wifi_expand_button])
+         spacing=10, children=[self.wifi_label,self.wifi_switch])
 
         # adding both into a main box
         self.main_box = Box(orientation="v", spacing=10,
-            children=[self.slider, wifi_box,self.wifi_revealer])
+            children=[self.slider, wifi_box])
 
         self.children = self.main_box
-
-    def scan_networks(self, *args):
-        networks = os.popen("nmcli -t -f SSID dev wifi").read().strip().splitlines()
-        for child in self.handler_box.get_children():
-            self.handler_box.remove(child)
-            child.destroy()
-        for network in networks:
-            button = Button(label=network, on_clicked=lambda *_, target=network: os.system(f"nmcli dev wifi connect '{target}'"))
-            self.handler_box.add(button)
-        self.handler_box.show_all()
-
 
     def sync_state(self, *args):
         # volume
@@ -166,7 +148,7 @@ class StatusBar(Window):
         self.sound_fabricator = Fabricator(
             poll_from=lambda *_: os.popen("wpctl get-volume @DEFAULT_AUDIO_SINK@").read().strip().replace("Volume: ", ""), 
             interval=500
-        ).build().connect("changed", lambda _, val: self.sound_label.set_label(f"Vol: {float(val) * 100:.0f}%")).unwrap()
+        ).build().connect("changed", lambda _, val: self.sound_label.set_label(f"Vol: {val}")).unwrap()
 
         self.date_fabricator = Fabricator(
             poll_from=lambda *_: time.strftime("%a,%b,%d"), interval=6000
