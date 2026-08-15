@@ -23,6 +23,9 @@ class calendarpopup(Window):
             **kwargs
         )
         self.children = Gtk.Calendar()
+        self.dismiss_layer = DismissLayer(on_dismiss=self.hide)
+        self.connect("show", lambda *_: self.dismiss_layer.show_all())
+        self.connect("hide", lambda *_: self.dismiss_layer.hide())
 
 class DismissLayer(Window):
     def __init__(self, on_dismiss, **kwargs):
@@ -147,8 +150,7 @@ class StatusBar(Window):
 
         self.date_button = Button(
             label="Date: --",
-            on_enter_notify_event=lambda *_: calendar_window.show_all(),
-            on_leave_notify_event=lambda *_: calendar_window.hide()
+            on_clicked=lambda *_: calendar_window.show_all() if not calendar_window.get_visible() else calendar_window.hide()
         )
         
         self.clock_label = Label(label="--:--:--")
