@@ -48,6 +48,7 @@ class settingspopup(Window):
             anchor="top left",
             margin=(45, 0, 0, 10), 
             visible=False,
+            keyboard_mode="on-demand",
             **kwargs
         )
         # sound slider
@@ -102,9 +103,18 @@ class settingspopup(Window):
                 child.destroy()
 
         for network in networks:
-            button = Button(label=network, on_clicked=lambda *_, target=network: os.system(f"nmcli dev wifi connect '{target}'"))
-            self.handler_box.add(button)
+            button = Button(
+            label=network,
+            on_clicked=lambda *_, target=network: [
+                setattr(self, 'pending_ssid', target),
+                self.password_entry.set_placeholder_text(f"Password for {target}"),
+                self.password_entry.show(),
+                self.password_entry.grab_focus()
+            ]
+        )
+        self.handler_box.add(button)
         self.handler_box.show_all()
+        self.password_entry.hide()
 
 
 
