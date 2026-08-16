@@ -65,12 +65,19 @@ class settingspopup(Window):
         
         # Wi-Fi toggle
         self.wifi_label = Label(label="Wi-Fi: --")
+        
         self.wifi_switch = Gtk.Switch()
         self.wifi_revealer = Gtk.Revealer()
+        self.password_entry = Gtk.Entry()
         self.wifi_expand_button = Button(label = "⌄")
         self.wifi_expand_button.connect("clicked", lambda *_: [self.scan_networks(), self.wifi_revealer.set_reveal_child(not self.wifi_revealer.get_reveal_child())])
         self.wifi_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
         self.handler_box = Box(orientation="v",  spacing=5,)
+        self.password_entry.set_placeholder_text("Password")
+        self.password_entry.set_visibility(False)
+        self.password_entry.connect("activate", self.connect_with_password)
+        self.password_entry.hide()
+        self.handler_box.add(self.password_entry)
         self.wifi_revealer.add(self.handler_box)
         self.wifi_switch.set_valign(Gtk.Align.CENTER)
         self.wifi_handler = self.wifi_switch.connect(
@@ -90,12 +97,15 @@ class settingspopup(Window):
     def scan_networks(self, *args):
         networks = os.popen("nmcli -t -f SSID dev wifi").read().strip().splitlines()
         for child in self.handler_box.get_children():
-            self.handler_box.remove(child)
-            child.destroy()
+            if child != self.password_entry:
+                self.handler_box.remove(child)
+                child.destroy()
+
         for network in networks:
             button = Button(label=network, on_clicked=lambda *_, target=network: os.system(f"nmcli dev wifi connect '{target}'"))
             self.handler_box.add(button)
         self.handler_box.show_all()
+
 
 
     def sync_state(self, *args):
@@ -116,6 +126,15 @@ class settingspopup(Window):
             self.wifi_switch.handler_unblock(self.wifi_handler)
             ssid = os.popen("nmcli -t -f ACTIVE,SSID dev wifi | grep '^yes' | cut -d: -f2").read().strip()
             self.wifi_label.set_label(f"Wi-Fi: {ssid}")
+        self.connect_with_password = lambda entry: self._connect_with_password(entry)
+
+    def  connect_with_password(self, entry):
+            password = entry.get_text()
+            os.system(f"nmcli dev wifi connect '{self.pending_ssid}' password '{password}'")
+            entry.set_text("")
+            entry.hide()
+
+    
 
 
 class StatusBar(Window):
