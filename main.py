@@ -1,3 +1,6 @@
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
 import time
 import os
 import fabric
@@ -7,11 +10,48 @@ from fabric.widgets.label import Label
 from fabric.widgets.button import Button
 from fabric.widgets.centerbox import CenterBox
 from fabric.widgets.wayland import WaylandWindow as Window
-import gi
-gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk
 from fabric.widgets.eventbox import EventBox
 from fabric.widgets.revealer import Revealer
+from gi.repository import Gtk
+import socket,json
+from wayfire import WayfireSocket
+
+
+def get_wayfire():
+    try:
+        sock = WayfireSocket(allow_manual_search=True)
+        views = sock.list_views()
+        
+        app_list = []
+        for view in views:
+            if view.get('role') == 'toplevel' and view.get('mapped') is True:
+                app_name = view.get('app-id')
+                view_id = view.get('id')
+                title = view.get('title', app_name) # Get the real window name
+                
+                if app_name:
+                    # Fix PWAs (like WhatsApp) so their icons don't break
+                    if "brave-" in app_name and len(app_name) > 15:
+                        app_name = "brave-browser"
+                        
+                    app_list.append({"id": view_id, "app_id": app_name, "title": title})
+                    
+        return app_list
+    except Exception:
+        return []
+
+def focus_window(view_id):
+    print(f"Attempting to focus window ID: {view_id}")
+    try:
+        sock = WayfireSocket(allow_manual_search=True)
+        # Attempt the standard focus method
+        if hasattr(sock, 'set_focus'):
+            sock.set_focus(view_id)
+        else:
+            print("Focus method missing. We need to check your pywayfire library.")
+    except Exception as e:
+        print(f"Focus Error: {e}")
+
 
 class calendarpopup(Window):
     def __init__(self, **kwargs):
@@ -97,22 +137,32 @@ class settingspopup(Window):
 
     def scan_networks(self, *args):
         networks = os.popen("nmcli -t -f SSID dev wifi").read().strip().splitlines()
+        saved_networks = os.popen("nmcli -t -f NAME connection show").read().strip().splitlines()
         for child in self.handler_box.get_children():
             if child != self.password_entry:
                 self.handler_box.remove(child)
                 child.destroy()
 
         for network in networks:
-            button = Button(
-            label=network,
-            on_clicked=lambda *_, target=network: [
-                setattr(self, 'pending_ssid', target),
-                self.password_entry.set_placeholder_text(f"Password for {target}"),
-                self.password_entry.show(),
-                self.password_entry.grab_focus()
-            ]
-        )
-        self.handler_box.add(button)
+            if network in saved_networks:
+               button = Button(
+                    label=network,
+                     on_clicked=lambda *_, target=network: [
+                    self.password_entry.hide(),
+                    os.system(f"nmcli dev wifi connect '{target}'")
+                ]
+            )
+            else:
+                button = Button(
+                     label=network,
+                        on_clicked=lambda *_, target=network: [
+                        setattr(self, 'pending_ssid', target),
+                        self.password_entry.set_placeholder_text(f"Password for {target}"),
+                        self.password_entry.show(),
+                        self.password_entry.grab_focus()    
+                        ]               
+                )
+            self.handler_box.add(button)
         self.handler_box.show_all()
         self.password_entry.hide()
 
@@ -144,9 +194,6 @@ class settingspopup(Window):
             entry.set_text("")
             entry.hide()
 
-    
-
-
 class StatusBar(Window):
     def __init__(self, calendar_window, settings_window, **kwargs):
         super().__init__(
@@ -159,6 +206,7 @@ class StatusBar(Window):
         self.wifi_label = Label(label="Wi-Fi: --")
         self.sound_label = Label(label="Vol: --%")
         self.battery_label = Label(label="Battery: --%")
+
 
         self.info_box = Box(
             orientation="h",
@@ -220,6 +268,11 @@ class StatusBar(Window):
             spacing=10,
             children=[]
         )
+        # The engine that polls Wayfire twice a second
+        self.dock_fabricator = Fabricator(
+            poll_from=lambda *_: get_wayfire(),
+            interval=500
+        ).build().connect("changed", lambda _, val: self.update_taskbar(val))
         
         self.children = CenterBox(
             center_children=self.app_container, 
@@ -227,6 +280,31 @@ class StatusBar(Window):
             end_children=self.box1
         )
         self.show_all()
+
+  
+    def update_taskbar(self, window_list):
+        # 1. Safely purge old buttons (Don't skip this, or icons will duplicate infinitely!)
+        for child in self.app_container.get_children():
+            self.app_container.remove(child)
+            child.destroy()
+            
+        # 2. Forge new buttons
+        for app in window_list:
+            icon = Gtk.Image.new_from_icon_name(app['app_id'], Gtk.IconSize.DND)
+            icon.set_pixel_size(32) 
+            
+            btn = Button(
+                image=icon,
+                tooltip_text=app['title'],
+                relief=Gtk.ReliefStyle.NONE, 
+                on_clicked=lambda *_, vid=app['id']: focus_window(vid) 
+            )
+            
+            # 3. THIS IS THE MISSING LINE! Attach the button to the UI
+            self.app_container.add(btn)
+            
+        # 4. Paint the new buttons to the screen
+        self.app_container.show_all()
 
 if __name__ == "__main__":
     settings_pop = settingspopup()
