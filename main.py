@@ -15,29 +15,44 @@ from fabric.widgets.revealer import Revealer
 from gi.repository import Gtk
 import socket,json
 from wayfire import WayfireSocket
-
+import subprocess
 
 def get_wayfire():
     try:
         sock = WayfireSocket(allow_manual_search=True)
-        views = sock.list_views()
+        views = sock.list_views()     
+        theme = Gtk.IconTheme.get_default()
         
         app_list = []
         for view in views:
             if view.get('role') == 'toplevel' and view.get('mapped') is True:
                 app_name = view.get('app-id')
                 view_id = view.get('id')
-                title = view.get('title', app_name) # Get the real window name
+                title = view.get('title', app_name)
                 
                 if app_name:
-                    # Fix PWAs (like WhatsApp) so their icons don't break
                     if "brave-" in app_name and len(app_name) > 15:
-                        app_name = "brave-browser"
+                        clean_words = "".join([c if c.isalnum() else " " for c in title]).lower().split()
                         
+                        app_name = "brave-browser" 
+                        
+                        # Dynamically ask Linux: "Do you have an icon matching any of these words?"
+                        for word in clean_words:
+                            if theme.has_icon(word):
+                                app_name = word 
+                                break
+                                
+                    if not theme.has_icon(app_name):
+                        if "kitty" in app_name.lower():
+                            app_name = "utilities-terminal" # The standard Linux terminal icon
+                        else:
+                            app_name = "application-x-executable" # A clean default gear icon
+                            
                     app_list.append({"id": view_id, "app_id": app_name, "title": title})
                     
         return app_list
-    except Exception:
+    except Exception as e:
+        print(f"IPC Error: {e}")
         return []
 
 def focus_window(view_id):
@@ -48,7 +63,7 @@ def focus_window(view_id):
         if hasattr(sock, 'set_focus'):
             sock.set_focus(view_id)
         else:
-            print("Focus method missing. We need to check your pywayfire library.")
+            print("Focus method missing. check your pywayfire library.")
     except Exception as e:
         print(f"Focus Error: {e}")
 
@@ -206,6 +221,7 @@ class StatusBar(Window):
         self.wifi_label = Label(label="Wi-Fi: --")
         self.sound_label = Label(label="Vol: --%")
         self.battery_label = Label(label="Battery: --%")
+        self.clock_label = Label(label="--:--:--")
 
 
         self.info_box = Box(
@@ -230,7 +246,6 @@ class StatusBar(Window):
             on_clicked=lambda *_: calendar_window.show_all() if not calendar_window.get_visible() else calendar_window.hide()
         )
         
-        self.clock_label = Label(label="--:--:--")
         
         self.clock_fabricator = Fabricator(
             poll_from=lambda *_: time.strftime("%I:%M:%S %p"), interval=1000
@@ -251,15 +266,20 @@ class StatusBar(Window):
             poll_from=lambda *_: time.strftime("%a,%b,%d"), interval=6000
         ).build().connect("changed", lambda _, val: self.date_button.set_label(f"{val}")).unwrap()
 
+        self.dock_fabricator = Fabricator(
+            poll_from=lambda *_: get_wayfire(),
+            interval=50
+        ).build().connect("changed", lambda _, val: self.update_taskbar(val))
+
         self.box1 = Box(
             orientation="h",
-            children=[self.date_button]
+            children=[self.date_button, self.clock_label]
         )
         
         self.box2 = Box(
             orientation="h",
             spacing=10,
-            children=[self.system_button, self.clock_label]
+            children=[self.system_button]
         )
         
         self.app_container = Box(
@@ -268,15 +288,22 @@ class StatusBar(Window):
             spacing=10,
             children=[]
         )
-        # The engine that polls Wayfire twice a second
-        self.dock_fabricator = Fabricator(
-            poll_from=lambda *_: get_wayfire(),
-            interval=500
-        ).build().connect("changed", lambda _, val: self.update_taskbar(val))
+
+        self.main_desktop = Box(
+            orientation = "h",
+            spacing=10,
+            children=[]
+        )
+        # main left box 
+        self.left_box = Box(
+            orientation="h",
+            spacing=10,
+            children=[self.box2,self.app_container]
+        )
         
         self.children = CenterBox(
-            center_children=self.app_container, 
-            start_children=self.box2, 
+            center_children=self.main_desktop, 
+            start_children=self.left_box,
             end_children=self.box1
         )
         self.show_all()
@@ -296,7 +323,7 @@ class StatusBar(Window):
             btn = Button(
                 image=icon,
                 tooltip_text=app['title'],
-                relief=Gtk.ReliefStyle.NONE, 
+                style="background: transparent; border: none; box-shadow: none;", 
                 on_clicked=lambda *_, vid=app['id']: focus_window(vid) 
             )
             
