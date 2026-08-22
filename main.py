@@ -218,16 +218,19 @@ class StatusBar(Window):
             **kwargs
         )
 
-        self.wifi_label = Label(label="Wi-Fi: --")
-        self.sound_label = Label(label="Vol: --%")
-        self.battery_label = Label(label="Battery: --%")
-        self.clock_label = Label(label="--:--:--")
+        self.wifi_image = Gtk.Image()
+        
 
+        self.sound_image = Gtk.Image()
+    
 
+        self.battery_image = Gtk.Image()
+
+    
         self.info_box = Box(
             orientation="h",
             spacing=10,
-            children=[self.wifi_label, self.sound_label, self.battery_label]
+            children=[self.wifi_image, self.sound_image, self.battery_image]
         )
 
         self.system_button = Button(
@@ -236,17 +239,17 @@ class StatusBar(Window):
         )
 
         self.wifi_fabricator = Fabricator(
-            poll_from=lambda *_: os.popen("nmcli -t -f ACTIVE,SSID dev wifi | grep '^yes' | cut -d: -f2").read().strip() 
+            poll_from=lambda *_: os.popen("nmcli -t -f ACTIVE,SIGNAL dev wifi | grep '^yes' | cut -d: -f2").read().strip() 
             if os.system("which nmcli > /dev/null 2>&1") == 0 
             else "N/A", interval=5000
-        ).build().connect("changed", lambda _, val: self.wifi_label.set_label(f"Wi-Fi: {val}")).unwrap()
+        ).build().connect("changed", lambda _, val: self.wifi_icon_update(val)).unwrap()
 
         self.date_button = Button(
             label="Date: --",
             on_clicked=lambda *_: calendar_window.show_all() if not calendar_window.get_visible() else calendar_window.hide()
         )
         
-        
+        self.clock_label = Label(label="--:--:--")
         self.clock_fabricator = Fabricator(
             poll_from=lambda *_: time.strftime("%I:%M:%S %p"), interval=1000
         ).build().connect("changed", lambda _, val: self.clock_label.set_label(f"{val}")).unwrap()
@@ -255,12 +258,12 @@ class StatusBar(Window):
             poll_from=lambda *_: open("/sys/class/power_supply/BAT1/capacity").read().strip() 
             if os.path.exists("/sys/class/power_supply/BAT1/capacity") 
             else "N/A", interval=5000
-        ).build().connect("changed", lambda _, val: self.battery_label.set_label(f"Battery: {val}%")).unwrap()
+        ).build().connect("changed", lambda _, val: self.battery_icon_name(val)).unwrap()
 
         self.sound_fabricator = Fabricator(
             poll_from=lambda *_: os.popen("wpctl get-volume @DEFAULT_AUDIO_SINK@").read().strip().replace("Volume: ", ""), 
             interval=500
-        ).build().connect("changed", lambda _, val: self.sound_label.set_label(f"Vol: {float(val) * 100:.0f}%")).unwrap()
+        ).build().connect("changed", lambda _, val: self.sound_icon_update(val)).unwrap()
 
         self.date_fabricator = Fabricator(
             poll_from=lambda *_: time.strftime("%a,%b,%d"), interval=6000
@@ -268,7 +271,7 @@ class StatusBar(Window):
 
         self.dock_fabricator = Fabricator(
             poll_from=lambda *_: get_wayfire(),
-            interval=50
+            interval=500
         ).build().connect("changed", lambda _, val: self.update_taskbar(val))
 
         self.box1 = Box(
@@ -307,15 +310,71 @@ class StatusBar(Window):
             end_children=self.box1
         )
         self.show_all()
+    def battery_icon_name(self, battery_percent):
+
+     battery_percent = int(battery_percent) if battery_percent != "N/A" else 0
+    
+     if battery_percent > 95:
+        icon_name = "battery-full-symbolic"
+        
+     elif battery_percent > 75:
+            icon_name = "battery-good-symbolic"
+            
+     elif battery_percent > 40:
+            icon_name = "battery-low-symbolic"
+            
+     elif battery_percent > 0:
+        icon_name = "battery-empty-symbolic"
+            
+     self.battery_image.set_from_icon_name(icon_name,Gtk.IconSize.LARGE_TOOLBAR)
+
+    def wifi_icon_update(self,signal_strength):
+        signal = int(signal_strength) if signal_strength else 0
+        if signal >= 70:
+            icon = "network-wireless-signal-excellent-symbolic"
+
+        elif signal < 70 and signal >= 40:
+            icon = "network-wireless-signal-good-symbolic"
+
+        elif signal < 40 and signal >= 10:
+            icon = "network-wireless-signal-weak-symbolic"
+                    
+        elif signal < 10:
+            icon = "network-wireless-signal-none-symbolic"
+                    
+        self.wifi_image.set_from_icon_name(icon,Gtk.IconSize.LARGE_TOOLBAR)
+
+    def sound_icon_update(self, val):
+        raw_string = str(val).strip()
+        
+        if "[MUTED]" in raw_string:
+            icon = "audio-volume-muted-symbolic"
+        else:
+            try:
+                clean_num = raw_string.replace("Volume:", "").strip()
+                volume = int(float(clean_num) * 100)
+                
+                if volume == 0:
+                    icon = "audio-volume-muted-symbolic"
+                elif volume < 33:
+                    icon = "audio-volume-low-symbolic"
+                elif volume < 66:
+                    icon = "audio-volume-medium-symbolic"
+                else:
+                    icon = "audio-volume-high-symbolic"
+                    
+            except ValueError:
+                icon = "audio-volume-muted-symbolic"
+                
+        self.sound_image.set_from_icon_name(icon, Gtk.IconSize.LARGE_TOOLBAR)
+        
 
   
     def update_taskbar(self, window_list):
-        # 1. Safely purge old buttons (Don't skip this, or icons will duplicate infinitely!)
         for child in self.app_container.get_children():
             self.app_container.remove(child)
             child.destroy()
             
-        # 2. Forge new buttons
         for app in window_list:
             icon = Gtk.Image.new_from_icon_name(app['app_id'], Gtk.IconSize.DND)
             icon.set_pixel_size(32) 
@@ -327,11 +386,11 @@ class StatusBar(Window):
                 on_clicked=lambda *_, vid=app['id']: focus_window(vid) 
             )
             
-            # 3. THIS IS THE MISSING LINE! Attach the button to the UI
             self.app_container.add(btn)
             
-        # 4. Paint the new buttons to the screen
         self.app_container.show_all()
+
+    
 
 if __name__ == "__main__":
     settings_pop = settingspopup()
