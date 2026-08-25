@@ -36,7 +36,6 @@ def get_wayfire():
                         
                         app_name = "brave-browser" 
                         
-                        # Dynamically ask Linux: "Do you have an icon matching any of these words?"
                         for word in clean_words:
                             if theme.has_icon(word):
                                 app_name = word 
