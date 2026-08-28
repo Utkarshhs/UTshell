@@ -254,7 +254,7 @@ class StatusBar(Window):
         ).build().connect("changed", lambda _, val: self.clock_label.set_label(f"{val}")).unwrap()
 
         self.battery_fabricator = Fabricator(
-            poll_from=lambda *_: open("/sys/class/power_supply/BAT1/capacity").read().strip() 
+            poll_from=lambda *_: os.popen("cat /sys/class/power_supply/BAT1/capacity /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'N/A'").read().strip() 
             if os.path.exists("/sys/class/power_supply/BAT1/capacity") 
             else "N/A", interval=5000
         ).build().connect("changed", lambda _, val: self.battery_icon_name(val)).unwrap()
@@ -309,23 +309,29 @@ class StatusBar(Window):
             end_children=self.box1
         )
         self.show_all()
-    def battery_icon_name(self, battery_percent):
+    def battery_icon_name(self, val):
+        try:
+            data = str(val).strip().split("\n")
+            battery_percent = int(data[0]) if data[0] != "N/A" else 0
+            status = data[1] if len(data) > 1 else "Unknown"
 
-     battery_percent = int(battery_percent) if battery_percent != "N/A" else 0
-    
-     if battery_percent > 95:
-        icon_name = "battery-full-symbolic"
-        
-     elif battery_percent > 75:
-            icon_name = "battery-good-symbolic"
-            
-     elif battery_percent > 40:
-            icon_name = "battery-low-symbolic"
-            
-     elif battery_percent > 0:
-        icon_name = "battery-empty-symbolic"
-            
-     self.battery_image.set_from_icon_name(icon_name,Gtk.IconSize.LARGE_TOOLBAR)
+            # 2. Base Logic Engine (Percentage)
+            if battery_percent > 95:
+                icon_name = "battery-full-symbolic"
+            elif battery_percent > 55:
+                icon_name = "battery-good-symbolic"
+            elif battery_percent > 30:
+                icon_name = "battery-low-symbolic"
+            else:
+                icon_name = "battery-empty-symbolic"
+
+            if status == "Charging":
+                icon_name = icon_name.replace("-symbolic", "-charging-symbolic")
+
+        except Exception:
+            icon_name = "battery-empty-symbolic"
+
+        self.battery_image.set_from_icon_name(icon_name, Gtk.IconSize.LARGE_TOOLBAR)
 
     def wifi_icon_update(self,signal_strength):
         signal = int(signal_strength) if signal_strength else 0
