@@ -254,9 +254,8 @@ class StatusBar(Window):
         ).build().connect("changed", lambda _, val: self.clock_label.set_label(f"{val}")).unwrap()
 
         self.battery_fabricator = Fabricator(
-            poll_from=lambda *_: os.popen("cat /sys/class/power_supply/BAT1/capacity /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'N/A'").read().strip() 
-            if os.path.exists("/sys/class/power_supply/BAT1/capacity") 
-            else "N/A", interval=5000
+        poll_from=lambda *_: os.popen("cat /sys/class/power_supply/BAT1/capacity /sys/class/power_supply/BAT1/status 2>/dev/null || echo 'N/A'").read().strip(),
+        # else "N/A", interval=5000
         ).build().connect("changed", lambda _, val: self.battery_icon_name(val)).unwrap()
 
         self.sound_fabricator = Fabricator(
@@ -287,7 +286,7 @@ class StatusBar(Window):
         self.app_container = Box(
             name="taskbar",
             orientation="h",
-            spacing=10,
+            spacing=10, 
             children=[]
         )
 
@@ -311,6 +310,7 @@ class StatusBar(Window):
         self.show_all()
     def battery_icon_name(self, val):
         try:
+            print(f"BATTERY DEBUG RAW: {repr(val)}")
             data = str(val).strip().split("\n")
             battery_percent = int(data[0]) if data[0] != "N/A" else 0
             status = data[1] if len(data) > 1 else "Unknown"
