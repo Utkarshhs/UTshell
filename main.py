@@ -219,17 +219,16 @@ class StatusBar(Window):
 
         self.wifi_image = Gtk.Image()
         
-
         self.sound_image = Gtk.Image()
     
-
         self.battery_image = Gtk.Image()
 
+        self.bluetooth_image = Gtk.Image()
     
         self.info_box = Box(
             orientation="h",
             spacing=10,
-            children=[self.wifi_image, self.sound_image, self.battery_image]
+            children=[self.wifi_image, self.sound_image, self.battery_image, self.bluetooth_image]
         )
 
         self.system_button = Button(
@@ -238,7 +237,7 @@ class StatusBar(Window):
         )
 
         self.wifi_fabricator = Fabricator(
-            poll_from=lambda *_: os.popen("nmcli -t -f ACTIVE,SIGNAL dev wifi | grep '^yes' | cut -d: -f2").read().strip() 
+            poll_from=lambda *_: os.popen("nmcli -t -f ACTIVE,SIGNAL dev wifi | grep '^yes' | cut -d: -f2").read().strip()
             if os.system("which nmcli > /dev/null 2>&1") == 0 
             else "N/A", interval=5000
         ).build().connect("changed", lambda _, val: self.wifi_icon_update(val)).unwrap()
@@ -247,8 +246,12 @@ class StatusBar(Window):
             label="Date: --",
             on_clicked=lambda *_: calendar_window.show_all() if not calendar_window.get_visible() else calendar_window.hide()
         )
-        
+        self.bluetooth_fabricator = Fabricator(
+            poll_from=lambda *_: os.popen("bluetoothctl show | grep 'Powered: yes' > /dev/null 2>&1 && echo 'Connected' || echo 'Disconnected'"), interval=5000
+        ).build().connect("changed", lambda _, val: self.bluetooth_icon_update(val)).unwrap()
+
         self.clock_label = Label(label="--:--:--")
+
         self.clock_fabricator = Fabricator(
             poll_from=lambda *_: time.strftime("%I:%M:%S %p"), interval=1000
         ).build().connect("changed", lambda _, val: self.clock_label.set_label(f"{val}")).unwrap()
@@ -266,6 +269,7 @@ class StatusBar(Window):
         self.date_fabricator = Fabricator(
             poll_from=lambda *_: time.strftime("%a,%b,%d"), interval=6000
         ).build().connect("changed", lambda _, val: self.date_button.set_label(f"{val}")).unwrap()
+
 
         self.dock_fabricator = Fabricator(
             poll_from=lambda *_: get_wayfire(),
@@ -310,7 +314,6 @@ class StatusBar(Window):
         self.show_all()
     def battery_icon_name(self, val):
         try:
-            print(f"BATTERY DEBUG RAW: {repr(val)}")
             data = str(val).strip().split("\n")
             battery_percent = int(data[0]) if data[0] != "N/A" else 0
             status = data[1] if len(data) > 1 else "Unknown"
@@ -395,6 +398,12 @@ class StatusBar(Window):
             
         self.app_container.show_all()
 
+    def bluetooth_icon_update(self, state):
+        if "Powered: yes" in state:
+            icon = "bluetooth-active-symbolic"
+        else:
+            icon = "bluetooth-disabled-symbolic"
+        self.bluetooth_image.set_from_icon_name(icon, Gtk.IconSize.LARGE_TOOLBAR)
     
 
 if __name__ == "__main__":
