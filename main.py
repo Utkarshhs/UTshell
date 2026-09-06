@@ -208,6 +208,17 @@ class settingspopup(Window):
             entry.set_text("")
             entry.hide()
 
+    def Controlcenterpopup(self, **kwargs):
+        super().__init__(
+            layer="overlay",
+            anchor="center",
+            margin=(0, 0, 0, 0),
+            visible=False,
+            keyboard_mode="on-demand",
+            **kwargs
+
+        )
+
 class StatusBar(Window):
     def __init__(self, calendar_window, settings_window, **kwargs):
         super().__init__(
@@ -224,6 +235,11 @@ class StatusBar(Window):
         self.battery_image = Gtk.Image()
 
         self.bluetooth_image = Gtk.Image()
+
+        self.center_button = Button(
+            label="Center",
+            on_clicked=lambda *_: print("Center button clicked")
+        )
     
         self.info_box = Box(
             orientation="h",
