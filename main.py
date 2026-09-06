@@ -211,22 +211,30 @@ class settingspopup(Window):
 class ControlCenterPopup(Window):
     def __init__(self, **kwargs):
         super().__init__(
-            layer="overlay",
+            layer="top",          
             anchor="top",
             margin=(10, 0, 0, 0),
             visible=False,
             keyboard_mode="on-demand",
+            child=Box(           
+                orientation="v",
+                spacing=10,
+                children=[
+                    Label(label="NOCTILLIA CONTROL CENTER")
+                ]
+            ),
             **kwargs
         )
 
 class StatusBar(Window):
-    def __init__(self, calendar_window, settings_window, **kwargs):
+    def __init__(self, calendar_window, settings_window, center_window, **kwargs):
         super().__init__(
             layer="top",
             anchor="left top right",
             exclusivity="auto",
             **kwargs
         )
+        self.center_window = center_window
 
         self.wifi_image = Gtk.Image()
         
@@ -237,6 +245,7 @@ class StatusBar(Window):
         self.bluetooth_image = Gtk.Image()
 
         self.profile_image = Gtk.Image.new_from_file("/home/utkarsh/.face")
+
         self.center_box = Box(
             orientation="h",
             spacing=10,
@@ -244,7 +253,7 @@ class StatusBar(Window):
         )
         self.center_button = Button(
             child=self.center_box,
-            on_clicked=lambda *_: print("Center button clicked")
+            on_clicked=lambda *_: self.center_window.show_all() if not self.center_window.get_visible() else self.center_window.hide()
         )
     
         self.info_box = Box(
@@ -329,7 +338,7 @@ class StatusBar(Window):
         )
         
         self.children = CenterBox(
-            center_children=self.main_desktop, 
+            center_children=self.center_button, 
             start_children=self.left_box,
             end_children=self.box1
         )
@@ -433,5 +442,5 @@ if __name__ == "__main__":
     my_popup = calendarpopup()
     center_pop = ControlCenterPopup()
     bar = StatusBar(calendar_window=my_popup, settings_window=settings_pop, center_window=center_pop)
-    app = Application("ut-shell", bar, my_popup, settings_pop)
+    app = Application("ut-shell", bar, my_popup, settings_pop,center_pop)
     app.run()
