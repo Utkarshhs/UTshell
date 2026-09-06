@@ -208,15 +208,15 @@ class settingspopup(Window):
             entry.set_text("")
             entry.hide()
 
-    def Controlcenterpopup(self, **kwargs):
+class ControlCenterPopup(Window):
+    def __init__(self, **kwargs):
         super().__init__(
             layer="overlay",
-            anchor="center",
-            margin=(0, 0, 0, 0),
+            anchor="top",
+            margin=(10, 0, 0, 0),
             visible=False,
             keyboard_mode="on-demand",
             **kwargs
-
         )
 
 class StatusBar(Window):
@@ -236,15 +236,21 @@ class StatusBar(Window):
 
         self.bluetooth_image = Gtk.Image()
 
+        self.profile_image = Gtk.Image.new_from_file("/home/utkarsh/.face")
+        self.center_box = Box(
+            orientation="h",
+            spacing=10,
+            children=[self.profile_image, self.sound_image]
+        )
         self.center_button = Button(
-            label="Center",
+            child=self.center_box,
             on_clicked=lambda *_: print("Center button clicked")
         )
     
         self.info_box = Box(
             orientation="h",
             spacing=10,
-            children=[self.wifi_image, self.sound_image, self.battery_image, self.bluetooth_image]
+            children=[self.wifi_image, self.battery_image, self.bluetooth_image]
         )
 
         self.system_button = Button(
@@ -425,6 +431,7 @@ class StatusBar(Window):
 if __name__ == "__main__":
     settings_pop = settingspopup()
     my_popup = calendarpopup()
-    bar = StatusBar(calendar_window=my_popup, settings_window=settings_pop)
+    center_pop = ControlCenterPopup()
+    bar = StatusBar(calendar_window=my_popup, settings_window=settings_pop, center_window=center_pop)
     app = Application("ut-shell", bar, my_popup, settings_pop)
     app.run()
