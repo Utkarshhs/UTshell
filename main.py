@@ -1,3 +1,4 @@
+import time
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
@@ -267,14 +268,65 @@ class ControlCenterPopup(Window):
         ])
         row3_sliders = Box(orientation="h", spacing=15, children=[audio_out_box, audio_in_box])
 
-  
-        row4_weather = Box(orientation="v", children=[
-            self.weather_label
-        ])
+        self.weather_label = Label(label="weather: --")
+        
+        row4_weather = Box(
+            orientation="v", 
+            children=[self.weather_label]
+        )
 
+        self.current_weather_cond = "Clear" 
+
+        self.time_icon = Gtk.Image.new_from_icon_name("weather-clear-night-symbolic", Gtk.IconSize.DIALOG)
+
+        def get_smart_icon(condition, hour_string):
+            hour = int(hour_string)
+            is_day = 6 <= hour < 18
+            cond = condition.lower()
+            
+            if "rain" in cond or "drizzle" in cond or "shower" in cond:
+                return "weather-showers-symbolic"
+            elif "storm" in cond or "thunder" in cond:
+                return "weather-storm-symbolic"
+            
+            elif "snow" in cond:
+                return "weather-snow-symbolic"
+            elif "fog" in cond or "mist" in cond:
+                return "weather-fog-symbolic"
+            
+            elif "cloud" in cond or "overcast" in cond:
+                if "partly" in cond or "few" in cond:
+                    return "weather-few-clouds-symbolic" if is_day else "weather-few-clouds-night-symbolic"
+                return "weather-overcast-symbolic"
+            
+            else: 
+                return "weather-clear-symbolic" if is_day else "weather-clear-night-symbolic"
+        def fetch_weather_data(*_):
+            try:
+                raw_data = os.popen("curl -s 'wttr.in/Bengaluru?format=%C|%t'").read().strip()
+                if "|" in raw_data:
+                    cond, temp = raw_data.split("|")
+                    self.current_weather_cond = cond.strip()  
+                    return f"{cond.strip()}, {temp.strip()}"  
+            except Exception:
+                pass
+            return "Weather unavailable"
+        
+        self.weather_fabricator = Fabricator(
+            poll_from=fetch_weather_data,
+            interval=1800000 
+        ).build().connect("changed", lambda _, val: self.weather_label.set_label(val)).unwrap()
+
+        self.time_icon_fabricator = Fabricator(
+            poll_from=lambda *_: time.strftime("%H"),
+            interval=60000 
+        ).build().connect(
+            "changed", 
+            lambda _, current_hour: self.time_icon.set_from_icon_name(get_smart_icon(self.current_weather_cond, current_hour), Gtk.IconSize.DIALOG)
+        ).unwrap()
 
         idle_box = Box(orientation="v", children=[
-            Gtk.Image.new_from_icon_name("weather-clear-night-symbolic", Gtk.IconSize.DIALOG) 
+            self.time_icon 
         ])
         
         stats_box = Box(orientation="v", spacing=10, children=[
