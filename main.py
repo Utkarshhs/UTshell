@@ -210,19 +210,95 @@ class settingspopup(Window):
 
 class ControlCenterPopup(Window):
     def __init__(self, **kwargs):
+        
+       
+        profile_img = Gtk.Image()
+        try:
+            profile_img.set_from_file("/home/utkarsh/.face")
+        except:
+            profile_img.set_from_icon_name("avatar-default-symbolic", Gtk.IconSize.DND)
+        profile_img.set_pixel_size(40)
+
+        profile_info = Box(orientation="v", children=[
+            Label(label="Utkarsh"),
+            Label(label="Uptime: 4m")
+        ])
+        
+        header_left = Box(orientation="h", spacing=10, children=[profile_img, profile_info])
+        
+        header_right = Box(orientation="h", spacing=5, children=[
+            Button(child=Gtk.Image.new_from_icon_name("emblem-system-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("system-shutdown-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+        ])
+        row1_header = CenterBox(start_children=header_left, end_children=header_right)
+
+
+        toggles_left = Box(orientation="h", spacing=5, children=[
+            Button(child=Gtk.Image.new_from_icon_name("network-wireless-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("bluetooth-active-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("computer-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("airplane-mode-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+        ])
+        
+        toggles_right = Box(orientation="h", spacing=5, children=[
+            Button(child=Gtk.Image.new_from_icon_name("preferences-system-notifications-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("night-light-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("microphone-sensitivity-muted-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(child=Gtk.Image.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+        ])
+        row2_toggles = Box(orientation="h", spacing=20, children=[toggles_left, toggles_right])
+
+
+        audio_out_box = Box(orientation="v", spacing=5, children=[
+            Box(orientation="h", spacing=5, children=[
+                Gtk.Image.new_from_icon_name("audio-volume-high-symbolic", Gtk.IconSize.MENU),
+                Label(label="800 Series Chipset Family A...")
+            ]),
+            Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        ])
+        
+        audio_in_box = Box(orientation="v", spacing=5, children=[
+            Box(orientation="h", spacing=5, children=[
+                Gtk.Image.new_from_icon_name("audio-input-microphone-symbolic", Gtk.IconSize.MENU),
+                Label(label="800 Series Chipset Family A...")
+            ]),
+            Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        ])
+        row3_sliders = Box(orientation="h", spacing=15, children=[audio_out_box, audio_in_box])
+
+  
+        row4_weather = Box(orientation="v", children=[
+            self.weather_label
+        ])
+
+
+        idle_box = Box(orientation="v", children=[
+            Gtk.Image.new_from_icon_name("weather-clear-night-symbolic", Gtk.IconSize.DIALOG) 
+        ])
+        
+        stats_box = Box(orientation="v", spacing=10, children=[
+            Box(orientation="v", children=[Label(label="1%"), Gtk.Image.new_from_icon_name("cpu", Gtk.IconSize.MENU)]),
+            Box(orientation="v", children=[Label(label="58°C"), Gtk.Image.new_from_icon_name("thermometer", Gtk.IconSize.MENU)]),
+            Box(orientation="v", children=[Label(label="22%"), Gtk.Image.new_from_icon_name("ram", Gtk.IconSize.MENU)]),
+            Box(orientation="v", children=[Label(label="27%"), Gtk.Image.new_from_icon_name("drive-harddisk", Gtk.IconSize.MENU)])
+        ])
+        row5_bottom = Box(orientation="h", spacing=40, children=[idle_box, stats_box])
+
+
+        master_spine = Box(
+            orientation="v",
+            spacing=20,
+            children=[row1_header, row2_toggles, row3_sliders, row4_weather, row5_bottom]
+        )
+
         super().__init__(
-            layer="top",          
+            layer="top",
             anchor="top",
             margin=(10, 0, 0, 0),
             visible=False,
             keyboard_mode="on-demand",
-            child=Box(           
-                orientation="v",
-                spacing=10,
-                children=[
-                    Label(label="NOCTILLIA CONTROL CENTER")
-                ]
-            ),
+            child=master_spine,
             **kwargs
         )
 
@@ -244,15 +320,23 @@ class StatusBar(Window):
 
         self.bluetooth_image = Gtk.Image()
 
-        self.profile_image = Gtk.Image.new_from_file("/home/utkarsh/.face")
+        self.profile_image = Gtk.Image()
+        try:
+            self.profile_image.set_from_file("/home/utkarsh/.face")
+        except Exception:
+            self.profile_image.set_from_icon_name("avatar-default-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
+        
+        self.profile_image.set_pixel_size(20)  
 
         self.center_box = Box(
             orientation="h",
             spacing=10,
+            name = "center_box",
             children=[self.profile_image, self.sound_image]
         )
         self.center_button = Button(
             child=self.center_box,
+            name = "center_box_button",
             on_clicked=lambda *_: self.center_window.show_all() if not self.center_window.get_visible() else self.center_window.hide()
         )
     
