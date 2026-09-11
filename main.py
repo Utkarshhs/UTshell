@@ -268,16 +268,16 @@ class ControlCenterPopup(Window):
         ])
         row3_sliders = Box(orientation="h", spacing=15, children=[audio_out_box, audio_in_box])
 
-        self.weather_label = Label(label="weather: --")
+        # self.weather_label = Label(label="weather: --")
         
-        row4_weather = Box(
-            orientation="v", 
-            children=[self.weather_label]
-        )
+        # row4_weather = Box(
+        #     orientation="v", 
+        #     children=[self.weather_label]
+        # )
 
-        self.current_weather_cond = "Clear" 
+        # self.current_weather_cond = "Clear" 
 
-        self.time_icon = Gtk.Image.new_from_icon_name("weather-clear-night-symbolic", Gtk.IconSize.DIALOG)
+        # self.time_icon = Gtk.Image.new_from_icon_name("weather-clear-night-symbolic", Gtk.IconSize.DIALOG)
 
         def get_smart_icon(condition, hour_string):
             hour = int(hour_string)
@@ -312,12 +312,25 @@ class ControlCenterPopup(Window):
                 pass
             return "Weather unavailable"
 
+        self.current_weather_cond = "Clear" 
         initial_weather = fetch_weather_data()
         current_hour = time.strftime("%H")
         initial_icon_name = get_smart_icon(self.current_weather_cond, current_hour)
-        set_weather_label = Label(label=initial_weather)
+        
+        self.weather_label = Label(label=initial_weather)
         self.time_icon = Gtk.Image.new_from_icon_name(initial_icon_name, Gtk.IconSize.DIALOG)
         
+  
+        row4_weather = Box(
+            orientation="v",
+            children=[self.weather_label]
+        )
+        
+        idle_box = Box(
+            orientation="v", 
+            children=[self.time_icon]
+        )
+
         self.weather_fabricator = Fabricator(
             poll_from=fetch_weather_data,
             interval=1800000 
@@ -330,7 +343,6 @@ class ControlCenterPopup(Window):
             "changed", 
             lambda _, current_hour: self.time_icon.set_from_icon_name(get_smart_icon(self.current_weather_cond, current_hour), Gtk.IconSize.DIALOG)
         ).unwrap()
-
         idle_box = Box(orientation="v", children=[
             self.time_icon 
         ])
