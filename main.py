@@ -311,6 +311,12 @@ class ControlCenterPopup(Window):
             except Exception:
                 pass
             return "Weather unavailable"
+
+        initial_weather = fetch_weather_data()
+        current_hour = time.strftime("%H")
+        initial_icon_name = get_smart_icon(self.current_weather_cond, current_hour)
+        set_weather_label = Label(label=initial_weather)
+        self.time_icon = Gtk.Image.new_from_icon_name(initial_icon_name, Gtk.IconSize.DIALOG)
         
         self.weather_fabricator = Fabricator(
             poll_from=fetch_weather_data,
