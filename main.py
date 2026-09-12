@@ -268,17 +268,6 @@ class ControlCenterPopup(Window):
         ])
         row3_sliders = Box(orientation="h", spacing=15, children=[audio_out_box, audio_in_box])
 
-        # self.weather_label = Label(label="weather: --")
-        
-        # row4_weather = Box(
-        #     orientation="v", 
-        #     children=[self.weather_label]
-        # )
-
-        # self.current_weather_cond = "Clear" 
-
-        # self.time_icon = Gtk.Image.new_from_icon_name("weather-clear-night-symbolic", Gtk.IconSize.DIALOG)
-
         def get_smart_icon(condition, hour_string):
             hour = int(hour_string)
             is_day = 6 <= hour < 18
@@ -306,8 +295,9 @@ class ControlCenterPopup(Window):
                 raw_data = os.popen("curl -s 'wttr.in/Bengaluru?format=%C|%t'").read().strip()
                 if "|" in raw_data:
                     cond, temp = raw_data.split("|")
-                    self.current_weather_cond = cond.strip()  
-                    return f"{cond.strip()}, {temp.strip()}"  
+                    self.current_weather_cond = cond.strip() 
+                    clean_temp = temp.replace("+", "")
+                    return f"{cond.strip()}, {clean_temp.strip()}"  
             except Exception:
                 pass
             return "Weather unavailable"
