@@ -220,10 +220,14 @@ class ControlCenterPopup(Window):
             profile_img.set_from_icon_name("avatar-default-symbolic", Gtk.IconSize.DND)
         profile_img.set_pixel_size(40)
 
+        self.profile_uptime_label = Label(label="Uptime: --")
         profile_info = Box(orientation="v", children=[
             Label(label="Utkarsh"),
-            Label(label="Uptime: 4m")
+            self.profile_uptime_label
         ])
+        self.uptime_fabricator = Fabricator(
+            poll_from=lambda *_: os.popen("uptime -p").read().strip(),
+            interval=60000).build().connect("changed", lambda _, val: self.profile_uptime_label.set_label(f"Uptime: {val}")).unwrap()
         
         header_left = Box(orientation="h", spacing=10, children=[profile_img, profile_info])
         
