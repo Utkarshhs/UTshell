@@ -241,8 +241,17 @@ class ControlCenterPopup(Window):
 
 
         toggles_left = Box(orientation="h", spacing=5, children=[
-            Button(child=Gtk.Image.new_from_icon_name("network-wireless-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
-            Button(child=Gtk.Image.new_from_icon_name("bluetooth-active-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
+            Button(
+                child=Gtk.Image.new_from_icon_name("network-wireless-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                on_clicked=lambda *_: os.system("nmcli radio wifi toggle")
+            ),
+            
+            Button(
+                child=Gtk.Image.new_from_icon_name("bluetooth-active-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                on_clicked=lambda *_: os.system("rfkill toggle bluetooth")
+            ),
+            
+            # (Keep your other buttons here...)
             Button(child=Gtk.Image.new_from_icon_name("computer-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
             Button(child=Gtk.Image.new_from_icon_name("airplane-mode-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         ])
