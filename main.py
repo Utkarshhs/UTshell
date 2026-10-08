@@ -264,11 +264,42 @@ class ControlCenterPopup(Window):
         ])
         row2_toggles = Box(orientation="h", spacing=20, children=[toggles_left, toggles_right])
 
+        def get_current_volume(target):
+                    try:
+                        raw = os.popen(f"wpctl get-volume {target}").read().strip()
+                        # raw looks like "Volume: 0.54"
+                        if "Volume:" in raw:
+                            # Split by space, grab the number at index 1, and convert it
+                            vol_float = float(raw.split()[1])
+                            return int(vol_float * 100)
+                    except Exception:
+                        pass
+                    return 50 
 
+        # --- SPEAKER ---
         self.speaker_slider = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
-        self.audio_in_slider = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
-        self.audio_in_slider.connect("value-changed",lambda slider: os.system(f"wpctl set-volume @DEFAULT_AUDIO_SOURCE@ {int(slider.get_value())}%"))
         
+        # Fetch and set the real volume here!
+        current_speaker_vol = get_current_volume("@DEFAULT_AUDIO_SINK@")
+        self.speaker_slider.set_value(current_speaker_vol)
+        
+        self.speaker_slider.connect(
+            "value-changed", 
+            lambda slider: os.system(f"wpctl set-volume @DEFAULT_AUDIO_SINK@ {int(slider.get_value())}%")
+        )
+
+
+        # --- MICROPHONE ---
+        self.audio_in_slider = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        
+        # Fetch and set the real mic volume here!
+        current_mic_vol = get_current_volume("@DEFAULT_AUDIO_SOURCE@")
+        self.audio_in_slider.set_value(current_mic_vol)
+        
+        self.audio_in_slider.connect(
+            "value-changed", 
+            lambda slider: os.system(f"wpctl set-volume @DEFAULT_AUDIO_SOURCE@ {int(slider.get_value())}%")
+        )
         self.speaker_slider.connect(
             "value-changed", 
             lambda slider: os.system(f"wpctl set-volume @DEFAULT_AUDIO_SINK@ {int(slider.get_value())}%")
@@ -276,7 +307,7 @@ class ControlCenterPopup(Window):
 
         audio_out_box = Box(orientation="v", spacing=5, children=[
             Box(orientation="h", spacing=5, children=[
-                Gtk.Image.new_from_icon_name("audio-volume-high-symbolic", Gtk.IconSize.MENU),
+                Gtk.Image.new_from_icon_name("audio-volume-high-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
                 Label(label="Speaker") 
             ]),
             self.speaker_slider 
@@ -284,7 +315,7 @@ class ControlCenterPopup(Window):
         
         audio_in_box = Box(orientation="v", spacing=5, children=[
             Box(orientation="h", spacing=5, children=[
-                Gtk.Image.new_from_icon_name("audio-input-microphone-symbolic", Gtk.IconSize.MENU),
+                Gtk.Image.new_from_icon_name("audio-input-microphone-symbolic", Gtk.IconSize.BUTTON),
                 Label(label="Microphone")
             ]),
             self.audio_in_slider
