@@ -265,20 +265,29 @@ class ControlCenterPopup(Window):
         row2_toggles = Box(orientation="h", spacing=20, children=[toggles_left, toggles_right])
 
 
+        self.speaker_slider = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.audio_in_slider = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.audio_in_slider.connect("value-changed",lambda slider: os.system(f"wpctl set-volume @DEFAULT_AUDIO_SOURCE@ {int(slider.get_value())}%"))
+        
+        self.speaker_slider.connect(
+            "value-changed", 
+            lambda slider: os.system(f"wpctl set-volume @DEFAULT_AUDIO_SINK@ {int(slider.get_value())}%")
+        )
+
         audio_out_box = Box(orientation="v", spacing=5, children=[
             Box(orientation="h", spacing=5, children=[
                 Gtk.Image.new_from_icon_name("audio-volume-high-symbolic", Gtk.IconSize.MENU),
-                Label(label="800 Series Chipset Family A...")
+                Label(label="Speaker") 
             ]),
-            Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+            self.speaker_slider 
         ])
         
         audio_in_box = Box(orientation="v", spacing=5, children=[
             Box(orientation="h", spacing=5, children=[
                 Gtk.Image.new_from_icon_name("audio-input-microphone-symbolic", Gtk.IconSize.MENU),
-                Label(label="800 Series Chipset Family A...")
+                Label(label="Microphone")
             ]),
-            Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+            self.audio_in_slider
         ])
         row3_sliders = Box(orientation="h", spacing=15, children=[audio_out_box, audio_in_box])
 
