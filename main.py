@@ -251,7 +251,6 @@ class ControlCenterPopup(Window):
                 on_clicked=lambda *_: os.system("rfkill toggle bluetooth")
             ),
             
-            # (Keep your other buttons here...)
             Button(child=Gtk.Image.new_from_icon_name("computer-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
             Button(child=Gtk.Image.new_from_icon_name("airplane-mode-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         ])
@@ -276,7 +275,6 @@ class ControlCenterPopup(Window):
                         pass
                     return 50 
 
-        # --- SPEAKER ---
         self.speaker_slider = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
         
         # Fetch and set the real volume here!
@@ -289,10 +287,8 @@ class ControlCenterPopup(Window):
         )
 
 
-        # --- MICROPHONE ---
         self.audio_in_slider = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
         
-        # Fetch and set the real mic volume here!
         current_mic_vol = get_current_volume("@DEFAULT_AUDIO_SOURCE@")
         self.audio_in_slider.set_value(current_mic_vol)
         
@@ -641,4 +637,4 @@ if __name__ == "__main__":
     center_pop = ControlCenterPopup()
     bar = StatusBar(calendar_window=my_popup, settings_window=settings_pop, center_window=center_pop)
     app = Application("ut-shell", bar, my_popup, settings_pop,center_pop)
-    app.run()
+    app.run() 
