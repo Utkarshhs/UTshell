@@ -239,21 +239,28 @@ class ControlCenterPopup(Window):
         ])
         row1_header = CenterBox(start_children=header_left, end_children=header_right)
 
+        
+        self.bt_icon = Gtk.Image.new_from_icon_name("bluetooth-active-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
+        
+        self.bt_button = Button(
+            child=self.bt_icon,
+on_clicked=lambda *_: os.system("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center bluetooth &")        )
+        
+
 
         toggles_left = Box(orientation="h", spacing=5, children=[
             Button(
                 child=Gtk.Image.new_from_icon_name("network-wireless-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
-                on_clicked=lambda *_: os.system("nmcli radio wifi toggle")
+                on_clicked=lambda *_: os.system("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center wifi &")
             ),
             
-            Button(
-                child=Gtk.Image.new_from_icon_name("bluetooth-active-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
-                on_clicked=lambda *_: os.system("rfkill toggle bluetooth")
-            ),
+            self.bt_button, 
             
             Button(child=Gtk.Image.new_from_icon_name("computer-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
             Button(child=Gtk.Image.new_from_icon_name("airplane-mode-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
         ])
+
+       
         
         toggles_right = Box(orientation="h", spacing=5, children=[
             Button(child=Gtk.Image.new_from_icon_name("preferences-system-notifications-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
