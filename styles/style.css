@@ -1,0 +1,143 @@
+/* ==========================================================================
+   UT-SHELL THEME: Ax-Shell x Caelestia x Noctalia Hybrid (GTK3 / Fabric)
+   Zero-Warning Direct Color Edition
+   ========================================================================== */
+
+/* --- 1. GLOBAL RESET & TYPOGRAPHY --- */
+* {
+    font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", "Inter", sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #cdd6f4;
+    outline: none;
+    box-shadow: none;
+    text-shadow: none;
+}
+
+/* --- 2. TOP BAR & FLOATING POPUP WINDOWS --- */
+window {
+    background-color: transparent;
+}
+
+window > box {
+    background-color: rgba(17, 17, 27, 0.88);
+    border: 1px solid rgba(205, 214, 244, 0.08);
+    border-radius: 18px;
+    padding: 14px 16px;
+    margin: 6px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+/* --- 3. LABELS & TEXT HIERARCHY --- */
+label {
+    color: #cdd6f4;
+    letter-spacing: 0.2px;
+}
+
+/* --- 4. BUTTONS & HARDWARE TOGGLES --- */
+button {
+    background-image: none;
+    background-color: rgba(30, 30, 46, 0.85);
+    border: 1px solid rgba(205, 214, 244, 0.08);
+    border-radius: 14px;
+    padding: 8px 12px;
+    min-width: 24px;
+    min-height: 24px;
+    transition: all 160ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+button:hover {
+    background-color: rgba(69, 71, 90, 0.85);
+    border-color: rgba(203, 166, 247, 0.35);
+    box-shadow: 0 4px 14px rgba(203, 166, 247, 0.15);
+}
+
+button:active {
+    background-color: #cba6f7;
+    color: #11111b;
+    border-color: #cba6f7;
+    transition: all 60ms ease;
+}
+
+button:active label,
+button:active image {
+    color: #11111b;
+}
+
+button.active {
+    background-image: linear-gradient(135deg, #cba6f7, #89b4fa);
+    color: #11111b;
+    border-color: transparent;
+    box-shadow: 0 4px 16px rgba(203, 166, 247, 0.3);
+}
+
+button.active label,
+button.active image {
+    color: #11111b;
+}
+
+/* --- 5. AUDIO SLIDERS / GTK.SCALE --- */
+scale {
+    padding: 8px 2px;
+    min-width: 135px;
+}
+
+scale value {
+    color: #89b4fa;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+scale contents trough {
+    background-color: rgba(49, 50, 68, 0.65);
+    border: 1px solid rgba(205, 214, 244, 0.08);
+    border-radius: 999px;
+    min-height: 10px;
+}
+
+scale contents trough highlight {
+    background-image: linear-gradient(90deg, #89b4fa, #cba6f7);
+    border: none;
+    border-radius: 999px;
+    min-height: 10px;
+    box-shadow: 0 0 10px rgba(137, 180, 250, 0.35);
+}
+
+scale contents trough slider {
+    background-image: none;
+    background-color: #ffffff;
+    border: 2px solid #cba6f7;
+    border-radius: 999px;
+    min-width: 16px;
+    min-height: 16px;
+    margin: -4px 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    transition: all 120ms ease;
+}
+
+scale contents trough slider:hover {
+    background-color: #cba6f7;
+    border-color: #ffffff;
+    box-shadow: 0 0 12px #cba6f7;
+}
+
+/* --- 6. NESTED CARDS & TOOLTIPS --- */
+box > box > box {
+    border-radius: 12px;
+}
+
+.card,
+.stat-card {
+    background-color: rgba(30, 30, 46, 0.85);
+    border: 1px solid rgba(205, 214, 244, 0.08);
+    border-radius: 14px;
+    padding: 10px 14px;
+}
+
+tooltip {
+    background-color: rgba(17, 17, 27, 0.95);
+    border: 1px solid rgba(203, 166, 247, 0.35);
+    border-radius: 10px;
+    padding: 6px 10px;
+}

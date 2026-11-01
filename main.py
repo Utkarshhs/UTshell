@@ -644,4 +644,5 @@ if __name__ == "__main__":
     center_pop = ControlCenterPopup()
     bar = StatusBar(calendar_window=my_popup, settings_window=settings_pop, center_window=center_pop)
     app = Application("ut-shell", bar, my_popup, settings_pop,center_pop)
+    app.set_stylesheet_from_file(os.path.join(os.path.dirname(__file__), "styles/style.css"))
     app.run() 
