@@ -212,6 +212,18 @@ class settingspopup(Window):
 
 class ControlCenterPopup(Window):
     def __init__(self, **kwargs):
+        super().__init__(
+            name="control-center-popup",
+            layer="top",
+            anchor="top",  
+            margin="8px 0px 0px 0px",
+            exclusivity="none",
+            keyboard_mode="on-demand",
+            visible=False,
+            **kwargs
+        )
+
+        profile_img = Gtk.Image()
         
        
         profile_img = Gtk.Image()
@@ -233,41 +245,81 @@ class ControlCenterPopup(Window):
         
         header_left = Box(orientation="h", spacing=10, children=[profile_img, profile_info])
         
+        def run_and_close(cmd):
+            os.system(cmd)
+            self.set_visible(False)
+
         header_right = Box(orientation="h", spacing=5, children=[
-            Button(child=Gtk.Image.new_from_icon_name("emblem-system-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
-            Button(child=Gtk.Image.new_from_icon_name("system-shutdown-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
-            Button(child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+            Button(
+                child=Gtk.Image.new_from_icon_name("emblem-system-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="System Settings",
+                on_clicked=lambda *_: run_and_close("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center &")
+            ),
+            Button(
+                child=Gtk.Image.new_from_icon_name("system-shutdown-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="Power Menu",
+                on_clicked=lambda *_: run_and_close("(wlogout || env XDG_CURRENT_DESKTOP=GNOME gnome-control-center power) &")
+            ),
+            Button(
+                child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="Close Control Center",
+                on_clicked=lambda *_: self.set_visible(False)
+            ),
         ])
         row1_header = CenterBox(start_children=header_left, end_children=header_right)
 
-        
         self.bt_icon = Gtk.Image.new_from_icon_name("bluetooth-active-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
-        
+
         self.bt_button = Button(
             child=self.bt_icon,
-on_clicked=lambda *_: os.system("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center bluetooth &")        )
-        
-
+            tooltip_text="Bluetooth Manager",
+            on_clicked=lambda *_: run_and_close(
+                "rfkill unblock bluetooth; (blueman-manager || env XDG_CURRENT_DESKTOP=GNOME gnome-control-center bluetooth) &"
+            )
+        )
 
         toggles_left = Box(orientation="h", spacing=5, children=[
             Button(
                 child=Gtk.Image.new_from_icon_name("network-wireless-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
-                on_clicked=lambda *_: os.system("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center wifi &")
+                tooltip_text="Wi-Fi Settings",
+                on_clicked=lambda *_: run_and_close("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center wifi &")
             ),
-            
-            self.bt_button, 
-            
-            Button(child=Gtk.Image.new_from_icon_name("computer-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
-            Button(child=Gtk.Image.new_from_icon_name("airplane-mode-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+            self.bt_button,
+            Button(
+                child=Gtk.Image.new_from_icon_name("computer-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="Display Settings",
+                on_clicked=lambda *_: run_and_close("(wdisplays || env XDG_CURRENT_DESKTOP=GNOME gnome-control-center display) &")
+            ),
+            Button(
+                child=Gtk.Image.new_from_icon_name("airplane-mode-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="Toggle Airplane Mode",
+                on_clicked=lambda *_: os.system("rfkill toggle wifi; rfkill toggle bluetooth")
+            )
         ])
 
-       
-        
         toggles_right = Box(orientation="h", spacing=5, children=[
-            Button(child=Gtk.Image.new_from_icon_name("preferences-system-notifications-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
-            Button(child=Gtk.Image.new_from_icon_name("night-light-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
-            Button(child=Gtk.Image.new_from_icon_name("microphone-sensitivity-muted-symbolic", Gtk.IconSize.LARGE_TOOLBAR)),
-            Button(child=Gtk.Image.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.LARGE_TOOLBAR))
+            Button(
+                child=Gtk.Image.new_from_icon_name("preferences-system-notifications-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="Notification Settings",
+                on_clicked=lambda *_: run_and_close("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center notifications &")
+            ),
+            Button(
+                child=Gtk.Image.new_from_icon_name("night-light-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="Night Light",
+                on_clicked=lambda *_: os.system("pkill -x wlsunset || wlsunset -T 4500 &")
+            ),
+            Button(
+                child=Gtk.Image.new_from_icon_name("microphone-sensitivity-muted-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="Mute / Unmute Microphone",
+                on_clicked=lambda *_: os.system("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
+            ),
+            Button(
+                child=Gtk.Image.new_from_icon_name("user-trash-symbolic", Gtk.IconSize.LARGE_TOOLBAR),
+                tooltip_text="🗑️ Do you mean windows?",
+                on_clicked=lambda *_: run_and_close(
+                    "(nautilus trash:/// || thunar trash:/// || dolphin trash:/ || xdg-open ~/.local/share/Trash/files) &"
+                )
+            )
         ])
         row2_toggles = Box(orientation="h", spacing=20, children=[toggles_left, toggles_right])
 
@@ -392,7 +444,7 @@ on_clicked=lambda *_: os.system("env XDG_CURRENT_DESKTOP=GNOME gnome-control-cen
 
         def fetch_weather_data(*_):
             try:
-                raw_data = os.popen("curl -s 'wttr.in/Bengaluru?format=%C|%t'").read().strip()
+                raw_data = os.popen("curl -sL --max-time 5 'https://wttr.in/Bengaluru?format=%C|%t'").read().strip()
                 if "|" in raw_data:
                     cond, temp = raw_data.split("|")
                     self.current_weather_cond = cond.strip()
@@ -415,6 +467,70 @@ on_clicked=lambda *_: os.system("env XDG_CURRENT_DESKTOP=GNOME gnome-control-cen
             poll_from=fetch_weather_data,
             interval=600000
         ).build().connect("changed", on_weather_updated).unwrap()
+
+        self.cpu_label = Label(label="0%")
+        self.temp_label = Label(label="0°C")
+        self.ram_label = Label(label="0%")
+        self.disk_label = Label(label="0%")
+
+        def make_stat_pill(icon_name, value_label):
+            icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.MENU)
+            icon.set_pixel_size(16)
+            return Box(
+                orientation="h",
+                spacing=6,
+                style_classes=["stat-card"],
+                children=[icon, value_label]
+            )
+
+        row5_stats = Box(
+            orientation="h",
+            spacing=8,
+            children=[
+                make_stat_pill("processor-symbolic", self.cpu_label),
+                make_stat_pill("sensors-temperature-symbolic", self.temp_label),
+                make_stat_pill("drive-multidisk-symbolic", self.ram_label),
+                make_stat_pill("drive-harddisk-symbolic", self.disk_label),
+            ]
+        )
+
+        def poll_system_stats(*_):
+            cpu = os.popen("top -bn1 | awk '/Cpu\\(s\\)/ {print int($2 + $4)}' 2>/dev/null || echo 0").read().strip()
+            temp = os.popen("cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n1 | awk '{print int($1/1000)}' || echo 0").read().strip()
+            ram = os.popen("free | awk '/Mem:/ {print int($3/$2 * 100)}' 2>/dev/null || echo 0").read().strip()
+            disk = os.popen("df -h / | awk 'NR==2 {print $5}' 2>/dev/null || echo 0%").read().strip()
+            return (cpu or "0", temp or "0", ram or "0", disk or "0%")
+
+        def update_system_stats(_, stats):
+            cpu, temp, ram, disk = stats
+            self.cpu_label.set_label(f"{cpu}%")
+            self.temp_label.set_label(f"{temp}°C")
+            self.ram_label.set_label(f"{ram}%")
+            self.disk_label.set_label(f"{disk}")
+
+        self.stats_fabricator = Fabricator(
+            poll_from=poll_system_stats,
+            interval=2000
+        ).build().connect("changed", update_system_stats).unwrap()
+
+        # --- PACK ALL ROWS INTO CONTROL CENTER WINDOW ---
+        row2 = locals().get("row2_toggles") or locals().get("row2") or locals().get("toggles_row") or toggles_left
+
+        self.main_box = Box(
+            orientation="v",
+            spacing=12,
+            style_classes=["popup-card"],
+            children=[
+                row1_header,
+                row2,
+                row3_sliders,
+                row4_weather,
+                row5_stats
+            ]
+        )
+        self.add(self.main_box)
+        self.show_all()
+        self.set_visible(False)
 
 from gi.repository import Gio
 
@@ -757,12 +873,16 @@ class StatusBar(Window):
         self.bluetooth_icon_update(bt_raw)
 
     def sound_icon_update(self, val):
+        sound_img = getattr(self, "sound_image", None)
+        if sound_img is None:
+            return
+
         raw_string = str(val).strip()
         if "[MUTED]" in raw_string:
             icon = "audio-volume-muted-symbolic"
         else:
             try:
-                clean_num = raw_string.replace("Volume:", "").strip()
+                clean_num = raw_string.replace("Volume:", "").strip().split()[0]
                 volume = int(float(clean_num) * 100)
                 if volume == 0:
                     icon = "audio-volume-muted-symbolic"
@@ -772,17 +892,18 @@ class StatusBar(Window):
                     icon = "audio-volume-medium-symbolic"
                 else:
                     icon = "audio-volume-high-symbolic"
-            except ValueError:
+            except Exception:
                 icon = "audio-volume-muted-symbolic"
-        self.sound_image.set_from_icon_name(icon, Gtk.IconSize.MENU)
+
+        sound_img.set_from_icon_name(icon, Gtk.IconSize.MENU)
 
     def bluetooth_icon_update(self, state):
-        if "Powered: yes" in str(state):
-            icon = "bluetooth-active-symbolic"
-        else:
-            icon = "bluetooth-disabled-symbolic"
-        self.bluetooth_image.set_from_icon_name(icon, Gtk.IconSize.MENU)
+        bt_img = getattr(self, "bluetooth_image", None)
+        if bt_img is None:
+            return
 
+        icon = "bluetooth-active-symbolic" if "Powered: yes" in str(state) else "bluetooth-disabled-symbolic"
+        bt_img.set_from_icon_name(icon, Gtk.IconSize.MENU)
     def update_taskbar(self, window_list):
         if self.apps_window:
             self.apps_window.update_apps(window_list)
