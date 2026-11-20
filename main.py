@@ -513,7 +513,6 @@ class ControlCenterPopup(Window):
             interval=2000
         ).build().connect("changed", update_system_stats).unwrap()
 
-        # --- PACK ALL ROWS INTO CONTROL CENTER WINDOW ---
         row2 = locals().get("row2_toggles") or locals().get("row2") or locals().get("toggles_row") or toggles_left
 
         self.main_box = Box(
@@ -946,14 +945,14 @@ class StatusBar(Window):
 if __name__ == "__main__":
     settings_pop = settingspopup()
     my_popup = calendarpopup()
-    center_pop = ControlCenterPopup() # Must be fully initialized here!
+    center_pop = ControlCenterPopup() 
     apps_pop = AppsPopup()
     launcher_pop = AppLauncherPopup()
 
     bar = StatusBar(
         calendar_window=my_popup,
         settings_window=settings_pop,
-        center_window=center_pop, # Passes the initialized popup into the bar
+        center_window=center_pop, 
         apps_window=apps_pop,
         launcher_window=launcher_pop
     )
