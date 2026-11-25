@@ -17,6 +17,148 @@ from gi.repository import Gtk
 import socket,json
 from wayfire import WayfireSocket
 import subprocess
+import threading
+from gi.repository import Gtk, Gdk, GLib, Gio
+
+
+
+class DismissiblePopup(Window):
+    def __init__(self, name, halign=Gtk.Align.CENTER, top_margin=48, side_margin=16, **kwargs):
+        super().__init__(
+            name=name,
+            layer="overlay",
+            anchor="top bottom left right",
+            exclusivity="none",
+            keyboard_mode="on-demand",
+            visible=False,
+            style_classes=["dismiss-backdrop"],
+            **kwargs
+        )
+
+        self.backdrop = Gtk.EventBox()
+        self.backdrop.set_visible_window(True)
+        self.backdrop.connect("button-press-event", self._on_backdrop_click)
+
+        self.card = Box(
+            orientation="v",
+            spacing=12,
+            style_classes=["popup-card"],
+        )
+        self.card.set_halign(halign)
+        self.card.set_valign(Gtk.Align.START)
+        self.card.set_margin_top(top_margin)
+        if halign == Gtk.Align.START:
+            self.card.set_margin_start(side_margin)
+        elif halign == Gtk.Align.END:
+            self.card.set_margin_end(side_margin)
+
+        self.backdrop.add(self.card)
+        self.add(self.backdrop)
+
+        self.connect("key-press-event", self._on_key_press)
+
+    def _on_backdrop_click(self, widget, event):
+        coords = self.card.translate_coordinates(widget, 0, 0)
+        if coords is not None:
+            cx, cy = coords
+            alloc = self.card.get_allocation()
+            inside = (cx <= event.x <= cx + alloc.width) and (cy <= event.y <= cy + alloc.height)
+            if not inside:
+                self.set_visible(False)
+                return True
+        return False
+
+    def _on_key_press(self, _widget, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.set_visible(False)
+            return True
+        return False
+
+    def toggle(self):
+        if self.get_visible():
+            self.set_visible(False)
+        else:
+            self.show_all()
+            self.set_visible(True)
+
+
+
+class ShellSettingsPopup(DismissiblePopup):
+    def __init__(self, app_ref=None, control_center=None, **kwargs):
+        super().__init__(name="shell-settings-popup", halign=Gtk.Align.CENTER, top_margin=52, **kwargs)
+        self.app_ref = app_ref
+        self.control_center = control_center
+
+        header = CenterBox(
+            start_children=Label(label="UT Shell Settings", style_classes=["popup-title"]),
+            end_children=Button(
+                child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU),
+                on_clicked=lambda *_: self.set_visible(False)
+            )
+        )
+
+        # 1. Power Profile Switcher (Fedora power-profiles-daemon)
+        power_row = Box(orientation="h", spacing=6, children=[
+            Button(label="Saver", on_clicked=lambda *_: subprocess.Popen(["powerprofilesctl", "set", "power-saver"])),
+            Button(label="Balanced", on_clicked=lambda *_: subprocess.Popen(["powerprofilesctl", "set", "balanced"])),
+            Button(label="Perf", on_clicked=lambda *_: subprocess.Popen(["powerprofilesctl", "set", "performance"])),
+        ])
+
+        # 2. Night Light Temperature Presets
+        night_row = Box(orientation="h", spacing=6, children=[
+            Button(label="Off", on_clicked=lambda *_: os.system("pkill -x wlsunset")),
+            Button(label="Warm (4500K)", on_clicked=lambda *_: os.system("pkill -x wlsunset; wlsunset -T 4500 &")),
+            Button(label="Deep (3500K)", on_clicked=lambda *_: os.system("pkill -x wlsunset; wlsunset -T 3500 &")),
+        ])
+
+        # 3. Weather City Setting
+        self.city_entry = Gtk.Entry()
+        self.city_entry.set_text("Bengaluru")
+        city_row = Box(orientation="h", spacing=6, children=[
+            self.city_entry,
+            Button(label="Apply", on_clicked=self.apply_weather_city)
+        ])
+
+        # 4. Shell & System Tools
+        tools_row = Box(orientation="v", spacing=6, children=[
+            Button(
+                style_classes=["app-popup-item"],
+                label="Reload Shell CSS (styles/style.css)",
+                on_clicked=self.reload_css
+            ),
+            Button(
+                style_classes=["app-popup-item"],
+                label="Display Layout (wdisplays)",
+                on_clicked=lambda *_: (os.system("wdisplays &"), self.set_visible(False))
+            ),
+            Button(
+                style_classes=["app-popup-item"],
+                label="Open Full System Settings (Fallback)",
+                on_clicked=lambda *_: (os.system("env XDG_CURRENT_DESKTOP=GNOME gnome-control-center &"), self.set_visible(False))
+            ),
+        ])
+
+        self.card.set_size_request(330, -1)
+        self.card.add(header)
+        self.card.add(Label(label="Power Profile", style_classes=["muted-text"]))
+        self.card.add(power_row)
+        self.card.add(Label(label="Night Light", style_classes=["muted-text"]))
+        self.card.add(night_row)
+        self.card.add(Label(label="Weather Location", style_classes=["muted-text"]))
+        self.card.add(city_row)
+        self.card.add(Label(label="Shell Utilities", style_classes=["muted-text"]))
+        self.card.add(tools_row)
+
+    def apply_weather_city(self, *_):
+        city = self.city_entry.get_text().strip()
+        if city and self.control_center:
+            self.control_center.weather_city = city
+            self.control_center.weather_label.set_label(f"Updating ({city})...")
+
+    def reload_css(self, *_):
+        if self.app_ref:
+            css_path = os.path.join(os.path.dirname(__file__), "styles/style.css")
+            self.app_ref.set_stylesheet_from_file(css_path)
 
 def get_wayfire():
     try:
@@ -56,11 +198,11 @@ def get_wayfire():
         print(f"IPC Error: {e}")
         return []
 
+
 def focus_window(view_id):
     print(f"Attempting to focus window ID: {view_id}")
     try:
         sock = WayfireSocket(allow_manual_search=True)
-        # Attempt the standard focus method
         if hasattr(sock, 'set_focus'):
             sock.set_focus(view_id)
         else:
@@ -69,9 +211,10 @@ def focus_window(view_id):
         print(f"Focus Error: {e}")
 
 
-class calendarpopup(Window):
+class calendarpopup(DismissiblePopup):
     def __init__(self, **kwargs):
         super().__init__(
+            name="calendar-popup",
             layer="overlay",
             anchor="top right",
             margin=(50, 10, 10, 10),
@@ -210,18 +353,362 @@ class settingspopup(Window):
             entry.set_text("")
             entry.hide()
 
-class ControlCenterPopup(Window):
+
+class WifiPopup(DismissiblePopup):
     def __init__(self, **kwargs):
+        super().__init__(name="wifi-popup", halign=Gtk.Align.CENTER, top_margin=52, **kwargs)
+        self.pending_ssid = None
+
+        self.wifi_switch = Gtk.Switch()
+        self.wifi_switch.set_valign(Gtk.Align.CENTER)
+        self.wifi_switch_handler = self.wifi_switch.connect("state-set", self.on_toggle_wifi)
+
+        refresh_btn = Button(
+            child=Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.MENU),
+            tooltip_text="Scan Networks",
+            on_clicked=lambda *_: self.refresh_networks(rescan=True)
+        )
+
+        header = CenterBox(
+            start_children=Label(label="Wi-Fi Networks", style_classes=["popup-title"]),
+            end_children=Box(orientation="h", spacing=8, children=[refresh_btn, self.wifi_switch])
+        )
+
+        self.status_label = Label(label="", style_classes=["muted-text"])
+
+        # Inline password box (hidden until user clicks a locked/unsaved network)
+        self.pw_entry = Gtk.Entry()
+        self.pw_entry.set_visibility(False)
+        self.pw_entry.set_placeholder_text("Enter Wi-Fi password...")
+        self.pw_entry.connect("activate", self.submit_password)
+
+        self.pw_box = Box(
+            orientation="h",
+            spacing=6,
+            children=[
+                self.pw_entry,
+                Button(label="Connect", on_clicked=self.submit_password)
+            ]
+        )
+        self.pw_box.set_no_show_all(True)
+        self.pw_box.set_visible(False)
+
+        self.list_box = Box(orientation="v", spacing=6)
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(260)
+        scrolled.set_min_content_width(300)
+        scrolled.add(self.list_box)
+
+        self.card.add(header)
+        self.card.add(self.status_label)
+        self.card.add(self.pw_box)
+        self.card.add(scrolled)
+
+    def toggle(self):
+        super().toggle()
+        if self.get_visible():
+            self.pw_box.set_visible(False)
+            self.refresh_networks(rescan=False)
+
+    def on_toggle_wifi(self, _switch, state):
+        mode = "on" if state else "off"
+        threading.Thread(
+            target=lambda: (
+                subprocess.run(["nmcli", "radio", "wifi", mode]),
+                GLib.idle_add(self.refresh_networks, False)
+            ),
+            daemon=True
+        ).start()
+        return False
+
+    def refresh_networks(self, rescan=False):
+        self.status_label.set_label("Scanning..." if rescan else "Loading...")
+
+        def worker():
+            radio = subprocess.run(["nmcli", "radio", "wifi"], capture_output=True, text=True).stdout.strip()
+            enabled = (radio == "enabled")
+            networks = []
+            if enabled:
+                cmd = ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list"]
+                if rescan:
+                    cmd += ["--rescan", "yes"]
+                out = subprocess.run(cmd, capture_output=True, text=True).stdout
+                seen = set()
+                for line in out.splitlines():
+                    parts = line.split(":")
+                    if len(parts) >= 4:
+                        in_use, ssid, signal, sec = parts[0], parts[1], parts[2], parts[3]
+                        if ssid and ssid not in seen:
+                            seen.add(ssid)
+                            networks.append((in_use == "*", ssid, int(signal or 0), bool(sec and sec != "--")))
+            GLib.idle_add(self._render_networks, enabled, networks)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _render_networks(self, enabled, networks):
+        self.wifi_switch.handler_block(self.wifi_switch_handler)
+        self.wifi_switch.set_active(enabled)
+        self.wifi_switch.handler_unblock(self.wifi_switch_handler)
+
+        for child in list(self.list_box.get_children()):
+            self.list_box.remove(child)
+            child.destroy()
+
+        if not enabled:
+            self.status_label.set_label("Wi-Fi is turned off")
+            return
+
+        self.status_label.set_label(f"{len(networks)} networks found")
+        for active, ssid, sig, locked in networks:
+            icon = "network-wireless-signal-excellent-symbolic" if sig >= 70 else (
+                "network-wireless-signal-good-symbolic" if sig >= 45 else "network-wireless-signal-weak-symbolic"
+            )
+            tag = "Connected" if active else f"{sig}%"
+            btn = Button(
+                style_classes=["app-popup-item", "active-row"] if active else ["app-popup-item"],
+                child=CenterBox(
+                    start_children=Box(orientation="h", spacing=8, children=[
+                        Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU),
+                        Label(label=ssid)
+                    ]),
+                    end_children=Label(label=tag, style_classes=["muted-text"])
+                ),
+                on_clicked=lambda *_, s=ssid, l=locked: self.connect_network(s, l)
+            )
+            self.list_box.add(btn)
+        self.list_box.show_all()
+
+    def connect_network(self, ssid, locked):
+        self.status_label.set_label(f"Connecting to {ssid}...")
+
+        def worker():
+            res = subprocess.run(["nmcli", "dev", "wifi", "connect", ssid], capture_output=True, text=True)
+            if res.returncode == 0:
+                GLib.idle_add(self.refresh_networks, False)
+            elif locked:
+                GLib.idle_add(self._prompt_password, ssid)
+            else:
+                GLib.idle_add(self.status_label.set_label, "Connection failed")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _prompt_password(self, ssid):
+        self.pending_ssid = ssid
+        self.status_label.set_label(f"Password required for {ssid}")
+        self.pw_entry.set_text("")
+        self.pw_box.set_visible(True)
+        self.pw_box.show_all()
+        self.pw_entry.grab_focus()
+
+    def submit_password(self, *_):
+        password = self.pw_entry.get_text()
+        ssid = self.pending_ssid
+        if not ssid or not password:
+            return
+        self.pw_box.set_visible(False)
+        self.status_label.set_label(f"Authenticating {ssid}...")
+
+        def worker():
+            res = subprocess.run(
+                ["nmcli", "dev", "wifi", "connect", ssid, "password", password],
+                capture_output=True, text=True
+            )
+            if res.returncode == 0:
+                GLib.idle_add(self.refresh_networks, False)
+            else:
+                GLib.idle_add(self.status_label.set_label, "Wrong password or failed")
+
+        threading.Thread(target=worker, daemon=True).start()
+
+class BluetoothPopup(DismissiblePopup):
+    def __init__(self, **kwargs):
+        super().__init__(name="bluetooth-popup", halign=Gtk.Align.CENTER, top_margin=52, **kwargs)
+
+        self.bt_switch = Gtk.Switch()
+        self.bt_switch.set_valign(Gtk.Align.CENTER)
+        self.bt_switch_handler = self.bt_switch.connect("state-set", self.on_toggle_bt)
+
+        scan_btn = Button(
+            child=Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.MENU),
+            tooltip_text="Scan for Bluetooth devices (5s)",
+            on_clicked=lambda *_: self.refresh_devices(scan=True)
+        )
+
+        header = CenterBox(
+            start_children=Label(label="Bluetooth", style_classes=["popup-title"]),
+            end_children=Box(orientation="h", spacing=8, children=[scan_btn, self.bt_switch])
+        )
+
+        self.status_label = Label(label="", style_classes=["muted-text"])
+        self.list_box = Box(orientation="v", spacing=6)
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(240)
+        scrolled.set_min_content_width(300)
+        scrolled.add(self.list_box)
+
+        self.card.add(header)
+        self.card.add(self.status_label)
+        self.card.add(scrolled)
+
+    def toggle(self):
+        super().toggle()
+        if self.get_visible():
+            self.refresh_devices(scan=False)
+
+    def on_toggle_bt(self, _switch, state):
+        mode = "on" if state else "off"
+        threading.Thread(
+            target=lambda: (
+                subprocess.run(["rfkill", "unblock", "bluetooth"]) if state else None,
+                subprocess.run(["bluetoothctl", "power", mode]),
+                GLib.idle_add(self.refresh_devices, False)
+            ),
+            daemon=True
+        ).start()
+        return False
+
+    def refresh_devices(self, scan=False):
+        self.status_label.set_label("Scanning (5s)..." if scan else "Loading devices...")
+
+        def worker():
+            show_out = subprocess.run(["bluetoothctl", "show"], capture_output=True, text=True).stdout
+            powered = "Powered: yes" in show_out
+            devices = []
+            if powered:
+                if scan:
+                    subprocess.run(["bluetoothctl", "--timeout", "5", "scan", "on"], capture_output=True)
+                all_out = subprocess.run(["bluetoothctl", "devices"], capture_output=True, text=True).stdout
+                conn_out = subprocess.run(["bluetoothctl", "devices", "Connected"], capture_output=True, text=True).stdout
+                for line in all_out.splitlines():
+                    parts = line.split(" ", 2)
+                    if len(parts) == 3 and parts[0] == "Device":
+                        mac, name = parts[1], parts[2]
+                        devices.append((mac, name, mac in conn_out))
+            GLib.idle_add(self._render_devices, powered, devices)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _render_devices(self, powered, devices):
+        self.bt_switch.handler_block(self.bt_switch_handler)
+        self.bt_switch.set_active(powered)
+        self.bt_switch.handler_unblock(self.bt_switch_handler)
+
+        for child in list(self.list_box.get_children()):
+            self.list_box.remove(child)
+            child.destroy()
+
+        if not powered:
+            self.status_label.set_label("Bluetooth is off")
+            return
+
+        self.status_label.set_label(f"{len(devices)} devices")
+        for mac, name, connected in devices:
+            action = "Disconnect" if connected else "Connect"
+            btn = Button(
+                style_classes=["app-popup-item", "active-row"] if connected else ["app-popup-item"],
+                child=CenterBox(
+                    start_children=Box(orientation="h", spacing=8, children=[
+                        Gtk.Image.new_from_icon_name("audio-headphones-symbolic" if connected else "bluetooth-active-symbolic", Gtk.IconSize.MENU),
+                        Label(label=name[:24])
+                    ]),
+                    end_children=Label(label=action, style_classes=["muted-text"])
+                ),
+                on_clicked=lambda *_, m=mac, c=connected: self.toggle_device(m, c)
+            )
+            self.list_box.add(btn)
+        self.list_box.show_all()
+
+    def toggle_device(self, mac, currently_connected):
+        cmd = "disconnect" if currently_connected else "connect"
+        self.status_label.set_label(f"{cmd.capitalize()}ing...")
+
+        def worker():
+            subprocess.run(["bluetoothctl", cmd, mac], capture_output=True)
+            GLib.idle_add(self.refresh_devices, False)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+def get_audio_output_info():
+    """Returns (icon_name, label_text) for the current default audio output."""
+    try:
+        wp_info = subprocess.check_output(
+            ["wpctl", "inspect", "@DEFAULT_AUDIO_SINK@"],
+            text=True,
+            stderr=subprocess.DEVNULL
+        ).lower()
+    except Exception:
+        wp_info = ""
+
+    active_port = ""
+    try:
+        default_sink = subprocess.check_output(
+            ["pactl", "get-default-sink"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        sinks_out = subprocess.check_output(
+            ["pactl", "list", "sinks"], text=True, stderr=subprocess.DEVNULL
+        )
+        in_sink = False
+        for line in sinks_out.splitlines():
+            if f"Name: {default_sink}" in line:
+                in_sink = True
+            elif in_sink and "Active Port:" in line:
+                active_port = line.lower()
+                break
+    except Exception:
+        pass
+
+    combined = wp_info + " " + active_port
+
+    if any(k in combined for k in ["headset", "handsfree", "hfp", "hsp"]):
+        return ("audio-headset-symbolic", "Headset")
+    if any(k in combined for k in ["headphone", "earbud", "buds", "airpods", "bluez", "a2dp"]):
+        return ("audio-headphones-symbolic", "Headphones")
+    if "hdmi" in combined or "displayport" in combined:
+        return ("video-display-symbolic", "HDMI Audio")
+    return ("audio-volume-high-symbolic", "Speaker")
+
+class ControlCenterPopup(DismissiblePopup):
+    def __init__(self, wifi_window=None, bt_window=None, shell_settings_window=None, **kwargs):
         super().__init__(
             name="control-center-popup",
-            layer="top",
-            anchor="top",  
-            margin="8px 0px 0px 0px",
-            exclusivity="none",
-            keyboard_mode="on-demand",
-            visible=False,
+            halign=Gtk.Align.CENTER,
+            top_margin=48,
+            side_margin=16,
             **kwargs
         )
+        self.wifi_window = wifi_window
+        self.bt_window = bt_window
+        self.shell_settings_window = shell_settings_window
+
+        profile_img = Gtk.Image()
+        try:
+            profile_img.set_from_file("/home/utkarsh/.face")
+        except:
+            profile_img.set_from_icon_name("avatar-default-symbolic", Gtk.IconSize.DND)
+        profile_img.set_pixel_size(40)
+        self.audio_out_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic", Gtk.IconSize.LARGE_TOOLBAR)
+        self.audio_out_label = Label(label="Speaker")
+
+        audio_out_box = Box(orientation="v", spacing=5, children=[
+            Box(orientation="h", spacing=6, children=[
+                self.audio_out_icon,
+                self.audio_out_label
+            ]),
+            self.speaker_slider
+        ])
+
+        def update_audio_output_ui(_, info):
+            icon_name, label_text = info
+            self.audio_out_icon.set_from_icon_name(icon_name, Gtk.IconSize.LARGE_TOOLBAR)
+            self.audio_out_label.set_label(label_text)
+
+        self.audio_output_fabricator = Fabricator(
+            poll_from=lambda *_: get_audio_output_info(),
+            interval=2000
+        ).build().connect("changed", update_audio_output_ui).unwrap()
 
         profile_img = Gtk.Image()
         
@@ -533,28 +1020,25 @@ class ControlCenterPopup(Window):
 
 from gi.repository import Gio
 
-class AppLauncherPopup(Window):
-    def __init__(self, **kwargs):
+class AppLauncherPopup(DismissiblePopup):
+    def __init__(self,**kwargs):
         super().__init__(
-            name="launcher-popup-window",
-            layer="top",
-            anchor="top left",
-            margin="8px 0px 0px 12px",
-            exclusivity="none",
-            keyboard_mode="on-demand",
-            visible=False,
-            **kwargs
-        )
+                name="launcher-popup-window",
+                halign=Gtk.Align.START,
+                top_margin=48,
+                side_margin=12,
+                **kwargs
+            )
         self.all_apps = []
         for app in Gio.AppInfo.get_all():
-            if app.should_show():
-                icon = app.get_icon()
-                icon_name = icon.to_string() if icon else "application-x-executable"
-                self.all_apps.append({
-                    "name": app.get_display_name() or app.get_name(),
-                    "icon": icon_name,
-                    "app_info": app
-                })
+                if app.should_show():
+                    icon = app.get_icon()
+                    icon_name = icon.to_string() if icon else "application-x-executable"
+                    self.all_apps.append({
+                        "name": app.get_display_name() or app.get_name(),
+                        "icon": icon_name,
+                        "app_info": app
+                    })
         self.all_apps.sort(key=lambda x: x["name"].lower())
 
         self.search_entry = Gtk.SearchEntry()
@@ -562,14 +1046,13 @@ class AppLauncherPopup(Window):
         self.search_entry.connect("search-changed", self.on_search_changed)
 
         header_box = CenterBox(
-            start_children=Label(label="Applications", style_classes=["popup-title"]),
-            end_children=Button(
-                child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU),
-                style_classes=["close-btn"],
-                on_clicked=lambda *_: self.set_visible(False)
+                start_children=Label(label="Applications", style_classes=["popup-title"]),
+                end_children=Button(
+                    child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU),
+                    style_classes=["close-btn"],
+                    on_clicked=lambda *_: self.set_visible(False)
+                )
             )
-        )
-
         self.apps_list_box = Box(orientation="v", spacing=6)
         self.scrolled = Gtk.ScrolledWindow()
         self.scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -578,12 +1061,12 @@ class AppLauncherPopup(Window):
         self.scrolled.add(self.apps_list_box)
 
         self.main_card = Box(
-            orientation="v",
-            spacing=10,
-            style_classes=["popup-card", "apps-popup-card"],
-            children=[header_box, self.search_entry, self.scrolled]
-        )
-        self.add(self.main_card)
+                orientation="v",
+                spacing=10,
+                style_classes=["popup-card", "apps-popup-card"],
+                children=[header_box, self.search_entry, self.scrolled]
+            )
+        self.card.add(self.main_card)
         self.populate_apps("")
         self.main_card.show_all()
 
@@ -623,36 +1106,34 @@ class AppLauncherPopup(Window):
         self.set_visible(False)
 
 
-class AppsPopup(Window):
-    def __init__(self, **kwargs):
-        super().__init__(
-            name="apps-popup-window",
-            layer="top",
-            anchor="top left",
-            margin="8px 0px 0px 56px",
-            exclusivity="none",
-            visible=False,
-            **kwargs
-        )
-        self.apps_list_box = Box(orientation="v", spacing=6)
+class AppsPopup(DismissiblePopup):
+    def __init__ (self,**kwargs):
+            super().__init__(
+                        name="apps-popup-window",
+                        halign=Gtk.Align.START,
+                        top_margin=48,
+                        side_margin=56,
+                        **kwargs
+                )
+            self.apps_list_box = Box(orientation="v", spacing=6)
 
-        header_box = CenterBox(
-            start_children=Label(label="Open Windows", style_classes=["popup-title"]),
-            end_children=Button(
-                child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU),
-                style_classes=["close-btn"],
-                on_clicked=lambda *_: self.set_visible(False)
-            )
-        )
+            header_box = CenterBox(
+                        start_children=Label(label="Open Windows", style_classes=["popup-title"]),
+                        end_children=Button(
+                            child=Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.MENU),
+                            style_classes=["close-btn"],
+                            on_clicked=lambda *_: self.set_visible(False)
+                        )
+                    )
 
-        self.main_card = Box(
-            orientation="v",
-            spacing=10,
-            style_classes=["popup-card", "apps-popup-card"],
-            children=[header_box, self.apps_list_box]
-        )
-        self.add(self.main_card)
-        self.main_card.show_all()
+            self.main_card = Box(
+                    orientation="v",
+                    spacing=10,
+                    style_classes=["apps-popup-card"],
+                    children=[header_box, self.apps_list_box]
+                )
+            self.card.add(self.main_card)
+            self.main_card.show_all()
 
     def update_apps(self, apps):
         for child in list(self.apps_list_box.get_children()):
@@ -943,20 +1424,32 @@ class StatusBar(Window):
 
 
 if __name__ == "__main__":
-    settings_pop = settingspopup()
+    wifi_pop = WifiPopup()
+    bt_pop = BluetoothPopup()
+    shell_settings_pop = ShellSettingsPopup()
     my_popup = calendarpopup()
-    center_pop = ControlCenterPopup() 
+    center_pop = ControlCenterPopup(
+        wifi_window=wifi_pop,
+        bt_window=bt_pop,
+        shell_settings_window=shell_settings_pop
+    )
     apps_pop = AppsPopup()
     launcher_pop = AppLauncherPopup()
 
     bar = StatusBar(
         calendar_window=my_popup,
-        settings_window=settings_pop,
-        center_window=center_pop, 
+        center_window=center_pop,
         apps_window=apps_pop,
         launcher_window=launcher_pop
     )
-    
-    app = Application("ut-shell", bar, my_popup, settings_pop, center_pop, apps_pop, launcher_pop)
+
+    app = Application(
+        "ut-shell",
+        bar, my_popup, center_pop, apps_pop, launcher_pop,
+        wifi_pop, bt_pop, shell_settings_pop
+    )
+    shell_settings_pop.app_ref = app
+    shell_settings_pop.control_center = center_pop
+
     app.set_stylesheet_from_file(os.path.join(os.path.dirname(__file__), "styles/style.css"))
     app.run()
